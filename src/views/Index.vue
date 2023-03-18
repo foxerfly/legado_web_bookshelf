@@ -10,7 +10,7 @@
       <div class="search-wrapper">
         <el-input
           size="mini"
-          placeholder="搜索书籍"
+          placeholder="搜索书架书籍"
           v-model="search"
           class="search-input"
         >
@@ -29,7 +29,8 @@
                   readingRecent.url,
                   readingRecent.name,
                   readingRecent.author,
-                  readingRecent.chapterIndex
+                  readingRecent.chapterIndex,
+                  readingRecent.chapterPos
                 )
               "
               :class="{ 'no-point': readingRecent.url == '' }"
@@ -75,7 +76,8 @@
                 book.bookUrl,
                 book.name,
                 book.author,
-                book.durChapterIndex
+                book.durChapterIndex,
+                book.durChapterPos
               )
             "
           >
@@ -94,7 +96,8 @@
                   book.bookUrl,
                   book.name,
                   book.author,
-                  book.durChapterIndex
+                  book.durChapterIndex,
+                  book.durChapterPos
                 )
               "
             >
@@ -133,6 +136,7 @@ export default {
         author: "",
         url: "",
         chapterIndex: 0,
+        chapterPos: 0,
       },
     };
   },
@@ -152,51 +156,25 @@ export default {
       spinner: "el-icon-loading",
       background: "rgb(247,247,247)",
     });
-    const that = this;
-    ajax
-      .get("/getBookshelf", {
-        timeout: 5000,
-      })
-      .then(function (response) {
-        that.loading.close();
-        that.$store.commit("setConnectType", "success");
-        if (response.data.isSuccess) {
-          //that.$store.commit("increaseBookNum", response.data.data.length);
-          that.$store.commit(
-            "addBooks",
-            response.data.data.sort(function (a, b) {
-              var x = a["durChapterTime"] || 0;
-              var y = b["durChapterTime"] || 0;
-              return y - x;
-            })
-          );
-        } else {
-          that.$message.error(response.data.errorMsg);
-        }
-        that.$store.commit("setConnectStatus", "已连接 ");
-        that.$store.commit("setNewConnect", false);
-      })
-      .catch(function (error) {
-        that.loading.close();
-        that.$store.commit("setConnectType", "danger");
-        that.$store.commit("setConnectStatus", "连接失败");
-        that.$message.error("后端连接失败");
-        that.$store.commit("setNewConnect", false);
-        throw error;
-      });
+    this.$store
+      .dispatch("saveBookProcess")
+      .then(() => this.$store.commit("clearReadingBook"))
+      .finally(() => this.fetchBookShelfData());
   },
   methods: {
     setIP() {},
-    toDetail(bookUrl, bookName, bookAuthor, chapterIndex) {
+    toDetail(bookUrl, bookName, bookAuthor, chapterIndex, chapterPos) {
       sessionStorage.setItem("bookUrl", bookUrl);
       sessionStorage.setItem("bookName", bookName);
       sessionStorage.setItem("bookAuthor", bookAuthor);
       sessionStorage.setItem("chapterIndex", chapterIndex);
+      sessionStorage.setItem("chapterPos", chapterPos);
       this.readingRecent = {
         name: bookName,
         author: bookAuthor,
         url: bookUrl,
         chapterIndex: chapterIndex,
+        chapterPos: chapterPos,
       };
       localStorage.setItem("readingRecent", JSON.stringify(this.readingRecent));
       this.$router.push({
@@ -259,10 +237,50 @@ export default {
             "/cover?path=" +
             encodeURIComponent(coverUrl);
     },
+    fetchBookShelfData() {
+      const that = this;
+      ajax
+        .get("/getBookshelf", {
+          timeout: 5000,
+        })
+        .then(function (response) {
+          that.loading.close();
+          that.$store.commit("setConnectType", "success");
+          if (response.data.isSuccess) {
+            //that.$store.commit("increaseBookNum", response.data.data.length);
+            that.$store.commit(
+              "addBooks",
+              response.data.data.sort(function (a, b) {
+                var x = a["durChapterTime"] || 0;
+                var y = b["durChapterTime"] || 0;
+                return y - x;
+              })
+            );
+          } else {
+            that.$message.error(response.data.errorMsg);
+          }
+          that.$store.commit("setConnectStatus", "已连接 ");
+          that.$store.commit("setNewConnect", false);
+        })
+        .catch(function (error) {
+          that.loading.close();
+          that.$store.commit("setConnectType", "danger");
+          that.$store.commit("setConnectStatus", "连接失败");
+          that.$message.error("后端连接失败");
+          that.$store.commit("setNewConnect", false);
+          throw error;
+        });
+    },
   },
   computed: {
     shelf() {
-      return this.$store.state.shelf;
+      let shelf = this.$store.state.shelf;
+      return shelf.filter((book) => {
+        if (this.search == "") return true;
+        return (
+          book.name.includes(this.search) || book.author.includes(this.search)
+        );
+      });
     },
     connectStatus() {
       return this.$store.state.connectStatus;

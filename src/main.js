@@ -24,13 +24,20 @@ Vue.use(VueLazyload, {
   error: require("./assets/imgs/error.png"),
   loading: require("./assets/imgs/loading.gif"),
   attempt: 1,
+  observer: true,
+  filter: {
+    replaceUnreachableImg(listener, _) {
+      // 相对链接 | 显示带有urlOption的链接不可达 替换
+      // 如果
+      const { src } = listener;
+      if (!/^http/.test(src) || /,\s*\{.*\}$/.test(src))
+        listener.src = getImageFromLegado(src);
+    },
+  },
   adapter: {
     error({ src, el }) {
-      let width = vuex.state.config.readWidth;
-      let image = getImageFromLegado(src, width);
-      if (image != null) {
-        el.src = image;
-      }
+      // 部分图片需要带上源的headers或者解密才能正常显示
+      el.src = getImageFromLegado(src);
     },
   },
 });
